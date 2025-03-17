@@ -64,7 +64,8 @@ if(LLVM_CONFIG)
         "--libdir"
         "--includedir"
         "--prefix"
-        "--src-root")
+        # "--src-root"
+        )
     execute_process(COMMAND ${CONFIG_COMMAND}
                     RESULT_VARIABLE HAD_ERROR
                     OUTPUT_VARIABLE CONFIG_OUTPUT)
@@ -112,8 +113,8 @@ set(xeus-zmq_REQUIRED_VERSION 1.1.0)
 find_package(xeus-zmq ${xeus-zmq_REQUIRED_VERSION} REQUIRED)
 find_package(pugixml REQUIRED)
 
-find_package(Clang REQUIRED)
-find_package(Cling REQUIRED)
+# find_package(Clang REQUIRED)
+# find_package(Cling REQUIRED)
 find_package(argparse REQUIRED)
 
 #########
@@ -221,7 +222,32 @@ target_include_directories(xeus-cling
                            PUBLIC
                            $<BUILD_INTERFACE:${XEUS_CLING_INCLUDE_DIR}>
                            $<INSTALL_INTERFACE:include>)
-target_link_libraries(xeus-cling PUBLIC clingInterpreter clingMetaProcessor clingUtils xeus-zmq pugixml argparse::argparse)
+# target_link_libraries(xeus-cling PUBLIC clingInterpreter clingMetaProcessor clingUtils xeus-zmq pugixml argparse::argparse)
+
+# Find LLVM dynamically
+# find_package(LLVM REQUIRED CONFIG)
+
+# Force LLVM to use shared libraries only
+# if (LLVM_STATIC)
+#     message(FATAL_ERROR "LLVM static libraries detected. Please use shared LLVM.")
+# endif()
+
+target_link_libraries(xeus-cling PUBLIC
+    ${LLVM_LIBRARY_DIR}/libLLVM.so
+    ${LLVM_LIBRARY_DIR}/libclang.so
+    ${LLVM_LIBRARY_DIR}/libcling.so
+    xeus-zmq pugixml argparse::argparse
+)
+
+# # Link LLVM dynamically
+# target_link_libraries(xeus-cling PUBLIC
+#     LLVM
+#     clang-cpp
+#     cling
+#     xeus-zmq
+#     pugixml
+#     argparse::argparse
+# )
 
 set_target_properties(xeus-cling PROPERTIES
                       PUBLIC_HEADER "${XEUS_CLING_HEADERS}"

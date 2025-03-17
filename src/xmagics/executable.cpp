@@ -17,6 +17,7 @@
 
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/SmallVector.h"
+#include "llvm/Frontend/Debug/Options.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Support/FileUtilities.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -25,7 +26,6 @@
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/DeclGroup.h"
 #include "clang/AST/RecursiveASTVisitor.h"
-#include "clang/Basic/DebugInfoOptions.h"
 #include "clang/Basic/Sanitizers.h"
 #include "clang/Basic/TargetInfo.h"
 #include "clang/CodeGen/BackendUtil.h"
@@ -113,7 +113,7 @@ namespace xcpp
             // Filter out functions added by Cling.
             if (auto Identifier = D->getIdentifier())
             {
-                if (Identifier->getName().startswith("__cling"))
+                if (Identifier->getName().starts_with("__cling"))
                 {
                     return true;
                 }
@@ -142,6 +142,7 @@ namespace xcpp
         auto* Context = m_interpreter.getLLVMContext();
         auto& AST = CI->getASTContext();
         auto& HeaderSearchOpts = CI->getHeaderSearchOpts();
+        auto FS = &CI->getVirtualFileSystem();
 
         // Generate relocations suitable for dynamic linking.
         auto CodeGenOpts = CI->getCodeGenOpts();
@@ -151,11 +152,11 @@ namespace xcpp
         if (EnableDebugInfo)
         {
             CodeGenOpts.setDebugInfo(
-                clang::codegenoptions::DebugInfoKind::FullDebugInfo);
+                llvm::codegenoptions::DebugInfoKind::FullDebugInfo);
         }
 
         std::unique_ptr<clang::CodeGenerator> CG(clang::CreateLLVMCodeGen(
-            CI->getDiagnostics(), "object", HeaderSearchOpts,
+            CI->getDiagnostics(), "object", FS, HeaderSearchOpts,
             CI->getPreprocessorOpts(), CodeGenOpts, *Context));
         CG->Initialize(AST);
 
@@ -180,11 +181,11 @@ namespace xcpp
         std::unique_ptr<llvm::raw_pwrite_stream> OS(
             new llvm::raw_fd_ostream(ObjectFD, true));
 
-        auto DataLayout = AST.getTargetInfo().getDataLayout();
+        auto DataLayout = AST.getTargetInfo().getDataLayoutString();
         EmitBackendOutput(CI->getDiagnostics(), HeaderSearchOpts,
                           CodeGenOpts, CI->getTargetOpts(),
                           CI->getLangOpts(), DataLayout, CG->GetModule(),
-                          clang::Backend_EmitObj, std::move(OS));
+                          clang::Backend_EmitObj, FS, std::move(OS));
         return true;
     }
 
@@ -220,10 +221,10 @@ namespace xcpp
 
         llvm::StringRef OutputFileStr(OutputFile);
         llvm::StringRef ErrorFileStr(ErrorFile);
-        llvm::SmallVector<llvm::Optional<llvm::StringRef>, 16> Redirects = {llvm::NoneType::None, OutputFileStr, ErrorFileStr};
+        llvm::SmallVector<std::optional<llvm::StringRef>, 16> Redirects = {std::nullopt, OutputFileStr, ErrorFileStr};
 
         // Finally run the linker.
-        int ret = llvm::sys::ExecuteAndWait(Compiler, Args, llvm::NoneType::None,
+        int ret = llvm::sys::ExecuteAndWait(Compiler, Args, std::nullopt,
                                             Redirects);
 
         // Read back output and error streams.
